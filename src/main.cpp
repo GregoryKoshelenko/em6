@@ -1,3 +1,5 @@
+// Police Flasher - ESP32 HW13
+
 #include <Arduino.h>
 
 const int RED_LED = 2;
@@ -12,7 +14,7 @@ const unsigned long DEBOUNCE_DELAY = 300;  // 300ms debounce
 bool redState = false;
 bool blueState = false;
 bool flasherEnabled = false;  // true=ON, false=OFF
-bool showRed = true;  // true=show Red pattern, false=show Blue pattern
+bool showRed = true;
 
 // Interrupt handler for button press
 void IRAM_ATTR buttonPressed() {
@@ -67,9 +69,6 @@ void loop() {
     // Flasher is off - all LEDs stay off
     return;
   }
-  
-  // Police flasher pattern: Red ON (500ms) → Blue ON (500ms) → repeat
-  // Total cycle: 1000ms (500ms red + 500ms blue)
   
   if (millis() - redTimer >= 500) {
     redState = !redState;
