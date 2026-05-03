@@ -1,0 +1,78 @@
+# PlatformIO
+.pio/
+.platformio/
+build/
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.vs/
+*.code-workspace
+
+# IDE and Editor files
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+*.c9/
+
+# Python and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Debugging and profiling
+.gdb_history
+*.elf
+*.hex
+*.bin
+
+# OS-specific
+*.swp
+*.swo
+*~
+.DS_Store
+._.DS_Store
+**/.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build artifacts
+*.o
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Dependencies
+.libdeps/
+
+# Serial Monitor logs
+*.log
