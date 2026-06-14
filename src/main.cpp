@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-const int ldrPin = 35; // LDR sensor connected to GPIO 35
+const int ldrPin = 4; // LDR sensor connected to GPIO 4
 const int adcResolution = 12; //-bit ADC resolution
 const adc_attenuation_t adcAttenuation = ADC_11db; // ADC attenuation for full range (0-3.3V)
 
