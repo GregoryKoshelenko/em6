@@ -4,9 +4,9 @@ static const int LDR_PIN = 4;
 static const int LED_PIN = 2;
 // static const int POT_PIN = 5;  // optional: potentiometer for max-brightness
 
-static const int      LEDC_CH   = 0;
-static const int      LEDC_FREQ = 5000;
-static const int      LEDC_BITS = 8;
+static const int      LEDC_CH   = 0; // LEDC channel to use for PWM output
+static const int      LEDC_FREQ = 5000; // 5 kHz PWM frequency
+static const int      LEDC_BITS = 8;    // PWM resolution
 static const int      LEDC_MAX  = (1 << LEDC_BITS) - 1;
 
 static const uint32_t SAMPLE_MS = 20;    // 50 Hz
@@ -101,9 +101,14 @@ void loop() {
     if (now - lastSample >= SAMPLE_MS) {
         lastSample = now;
         rawADC = analogRead(LDR_PIN);
-        if (!validateSensor(rawADC)) { ledcWrite(LEDC_CH, 0); return; }
-        updateTarget();
-        applyFade();
+        if (!validateSensor(rawADC)) { 
+            ledcWrite(LEDC_CH, 0); 
+        }
+        else {
+            updateTarget();
+            applyFade();
+        }
+        
     }
 
     if (now - lastPrint >= PRINT_MS) {
