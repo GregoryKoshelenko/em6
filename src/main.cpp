@@ -1,10 +1,6 @@
 #include <Arduino.h>
 #include <esp_sleep.h>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Config
-// ─────────────────────────────────────────────────────────────────────────────
-
 struct Config {
     static constexpr uint8_t  LED1_PIN         = 2;
     static constexpr uint8_t  LED2_PIN         = 21;
@@ -22,10 +18,6 @@ struct Config {
 
     static constexpr uint32_t SERIAL_BAUD = 115200UL;
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Led
-// ─────────────────────────────────────────────────────────────────────────────
 
 enum class LedState : uint8_t { Off = LOW, On = HIGH };
 
@@ -55,10 +47,6 @@ private:
     LedState      _state;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Blinker
-// ─────────────────────────────────────────────────────────────────────────────
-
 class Blinker {
 public:
     Blinker(Led& led, unsigned long periodMs)
@@ -83,9 +71,6 @@ private:
     unsigned long _last;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PowerSleep — estimates next event, sleeps, tracks power stats
-// ─────────────────────────────────────────────────────────────────────────────
 
 class PowerSleep {
 public:
@@ -148,10 +133,6 @@ private:
     unsigned long _lastReport;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Module objects
-// ─────────────────────────────────────────────────────────────────────────────
-
 static Led led1(Config::LED1_PIN);
 static Led led2(Config::LED2_PIN);
 static Led led3(Config::LED3_PIN);
@@ -160,10 +141,6 @@ static Blinker   blinker1(led1, Config::LED1_PERIOD_MS);
 static Blinker   blinker2(led2, Config::LED2_PERIOD_MS);
 static Blinker   blinker3(led3, Config::LED3_PERIOD_MS);
 static PowerSleep sleeper;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// setup / loop
-// ─────────────────────────────────────────────────────────────────────────────
 
 void setup() {
     Serial.begin(Config::SERIAL_BAUD);
