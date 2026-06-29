@@ -12,28 +12,29 @@ void setup() {
   analogSetPinAttenuation(ldrPin, adcAttenuation); // Set ADC attenuation for the LDR pin
 }
 
+static const int32_t VREF_MV = 3300;
+static const int32_t ADC_MAX = (1 << 12) - 1; // 4095
+
 void loop() {
-  int32_t raw = analogRead(ldrPin); // Read raw ADC value from the LDR sensor
-  float Vref = 3300.0; // Reference voltage in millivolts (3.3V — full range with ADC_11db)
-  float Vcalc = (raw * Vref) / ((1 << adcResolution) - 1); // Calculate voltage from raw ADC value
-  Vcalc /= 1000.0; // Convert millivolts to volts
+  int32_t raw     = analogRead(ldrPin);
+  int32_t calcMv  = (raw * VREF_MV) / ADC_MAX;
+  int32_t directMv = analogReadMilliVolts(ldrPin);
 
-  int32_t mv = analogReadMilliVolts(ldrPin); // Read voltage in millivolts directly from the LDR sensor
-  float readVoltage = mv / 1000.0; // Convert millivolts to volts
-  float error = (readVoltage != 0.0f) ? ((readVoltage - Vcalc) / readVoltage) * 100.0f : NAN;
-
-  Serial.print("Raw ADC Value: ");
+  Serial.print("Raw: ");
   Serial.print(raw);
-  Serial.print(" | Calculated Voltage: ");
-  Serial.print(Vcalc, 3);
-  Serial.print(" V | Direct Voltage: ");
-  Serial.print(readVoltage, 3);
-  Serial.print(" V | Error: ");
-  if (isnan(error)) {
+  Serial.print(" | Calc: ");
+  Serial.print(calcMv);
+  Serial.print(" mV | Direct: ");
+  Serial.print(directMv);
+  Serial.print(" mV | Error: ");
+  if (directMv == 0) {
       Serial.println("N/A");
   } else {
-      Serial.print(error, 2);
-      Serial.println(" %");
+      int32_t errorX10 = ((directMv - calcMv) * 1000) / directMv; // tenths of a percent
+      Serial.print(errorX10 / 10);
+      Serial.print(".");
+      Serial.print(abs(errorX10 % 10));
+      Serial.println("%");
   }
-  delay(2000); // Wait for 2 seconds before the next reading
+  delay(2000);
 }
