@@ -149,7 +149,7 @@ void loop() {
         }
         applyMode(currentMode);
 
-        Serial.print("Mode → ");
+        Serial.print("Mode: ");
         Serial.println(modeLabel(currentMode));
     }
 
@@ -163,7 +163,7 @@ void loop() {
         redBlinker.setPeriod(period);
         blueBlinker.setPeriod(period);
 
-        Serial.print("Speed → ");
+        Serial.print("Speed: ");
         Serial.println(fastBlink ? "fast (200ms)" : "slow (800ms)");
     }
 
