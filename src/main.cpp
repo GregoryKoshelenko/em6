@@ -1,182 +1,159 @@
 #include <Arduino.h>
 
-enum class LedState  : uint8_t { Off = LOW, On = HIGH };
-enum class BlinkMode : uint8_t { Blinking, AlwaysOn, AlwaysOff };
-
 struct Config {
-    static constexpr uint8_t  RED_LED_PIN      = 2;
-    static constexpr uint8_t  BLUE_LED_PIN     = 21;
-    static constexpr uint8_t  BUTTON_PIN       = 7;
-    static constexpr uint8_t  BOOT_BUTTON_PIN  = 0;
+    // Task 1: Relay
+    static constexpr uint8_t       RELAY_CTRL_PIN    = 5;
+    static constexpr uint8_t       RELAY_FB_PIN      = 18;
+    static constexpr uint8_t       MEAS_COUNT        = 10;
+    static constexpr unsigned long MEAS_INTERVAL_MS  = 500UL;
 
-    static constexpr unsigned long FAST_BLINK_MS = 200UL;
-    static constexpr unsigned long SLOW_BLINK_MS = 800UL;
-    static constexpr unsigned long DEBOUNCE_MS   = 50UL;
-    static constexpr uint32_t     SERIAL_BAUD    = 115200UL;
+    // Task 2: Soft PWM
+    static constexpr uint8_t       POT_PIN           = 34;
+    static constexpr uint8_t       PWM_PIN           = 19;
+    static constexpr unsigned long PWM_PERIOD_MS     = 20UL;
+    static constexpr uint32_t      ADC_MAX           = 4095UL;
 
-    static const uint16_t REPORT_EVERY; 
-    static const uint8_t  SHORT_PRESS_BLINKS;
+    static constexpr uint32_t      SERIAL_BAUD       = 115200UL;
 };
 
-const uint16_t Config::REPORT_EVERY       = 1000U;
-const uint8_t  Config::SHORT_PRESS_BLINKS = 3U;
+static volatile bool          gContactFired = false;
+static volatile unsigned long gContactTime  = 0;
 
+void IRAM_ATTR onRelayContact() {
+    gContactTime  = millis();
+    gContactFired = true;
+}
 
-class Led {
+class RelayTimer {
 public:
-    constexpr explicit Led(uint8_t pin)
-        : _pin(pin), _state(LedState::Off) {}
+    RelayTimer()
+        : _triggerTime(0), _lastMeas(0), _sum(0), _count(0),
+          _state(State::Triggering) {}
 
-    void init() {
+    void begin() {
+        pinMode(Config::RELAY_CTRL_PIN, OUTPUT);
+        pinMode(Config::RELAY_FB_PIN,   INPUT_PULLUP);
+        digitalWrite(Config::RELAY_CTRL_PIN, LOW);
+        attachInterrupt(digitalPinToInterrupt(Config::RELAY_FB_PIN),
+                        onRelayContact, FALLING);
+    }
+
+    bool done() const { return _state == State::Finished; }
+
+    void tick(unsigned long now) {
+        switch (_state) {
+            case State::Triggering:
+                gContactFired = false;
+                _triggerTime  = now;
+                digitalWrite(Config::RELAY_CTRL_PIN, HIGH);
+                _state = State::WaitContact;
+                break;
+
+            case State::WaitContact:
+                if (gContactFired) {
+                    const unsigned long elapsed = gContactTime - _triggerTime;
+                    _sum += elapsed;
+                    _count++;
+                    Serial.print("  [");
+                    Serial.print(_count);
+                    Serial.print("/");
+                    Serial.print(Config::MEAS_COUNT);
+                    Serial.print("] ");
+                    Serial.print(elapsed);
+                    Serial.println(" ms");
+                    digitalWrite(Config::RELAY_CTRL_PIN, LOW);
+                    _lastMeas = now;
+                    _state = (_count < Config::MEAS_COUNT) ? State::Cooldown
+                                                           : State::PrintResult;
+                }
+                break;
+
+            case State::Cooldown:
+                if (now - _lastMeas >= Config::MEAS_INTERVAL_MS) {
+                    _state = State::Triggering;
+                }
+                break;
+
+            case State::PrintResult:
+                Serial.println("---------------------");
+                Serial.print("Average: ");
+                Serial.print(_sum / _count);
+                Serial.println(" ms");
+                _state = State::Finished;
+                break;
+
+            case State::Finished:
+                break;
+        }
+    }
+
+private:
+    enum class State : uint8_t { Triggering, WaitContact, Cooldown, PrintResult, Finished };
+
+    unsigned long _triggerTime;
+    unsigned long _lastMeas;
+    unsigned long _sum;
+    uint8_t       _count;
+    State         _state;
+};
+
+
+class SoftPwm {
+public:
+    explicit SoftPwm(uint8_t pin) : _pin(pin), _duty(0) {}
+
+    void begin() {
         pinMode(_pin, OUTPUT);
-        set(LedState::Off);
+        digitalWrite(_pin, LOW);
     }
 
-    void set(LedState state) {
-        _state = state;
-        digitalWrite(_pin, static_cast<uint8_t>(state));
+    void setDuty(uint8_t duty) {
+        _duty = (duty > 100) ? 100 : duty;
     }
 
-    void toggle() {
-        set(_state == LedState::On ? LedState::Off : LedState::On);
-    }
+    uint8_t duty() const { return _duty; }
 
-    LedState state() const { return _state; }
+    void tick(unsigned long now) {
+        const unsigned long phase  = now % Config::PWM_PERIOD_MS;
+        const unsigned long onTime = (Config::PWM_PERIOD_MS * _duty) / 100UL;
+        digitalWrite(_pin, phase < onTime ? HIGH : LOW);
+    }
 
 private:
     const uint8_t _pin;
-    LedState      _state;
+    uint8_t       _duty;
 };
 
 
-class Blinker {
-public:
-    Blinker(Led& led, unsigned long periodMs)
-        : _led(led), _halfPeriod(periodMs / 2), _last(0) {}
+static RelayTimer relayTimer;
+static SoftPwm    motorPwm(Config::PWM_PIN);
 
-    void setPeriod(unsigned long periodMs) {
-        _halfPeriod = periodMs / 2;
-    }
-
-    void tick(unsigned long now) {
-        if (now - _last >= _halfPeriod) {
-            _led.toggle();
-            _last = now;
-        }
-    }
-
-private:
-    Led&          _led;
-    unsigned long _halfPeriod;
-    unsigned long _last;
-};
-
-
-static volatile bool gModeButtonEvent  = false;
-static volatile bool gSpeedButtonEvent = false;
-
-void IRAM_ATTR onModeButton()  { gModeButtonEvent  = true; }
-void IRAM_ATTR onSpeedButton() { gSpeedButtonEvent = true; }
-
-
-static Led     redLed(Config::RED_LED_PIN);
-static Led     blueLed(Config::BLUE_LED_PIN);
-static Blinker redBlinker(redLed,  Config::SLOW_BLINK_MS);
-static Blinker blueBlinker(blueLed, Config::SLOW_BLINK_MS);
-static BlinkMode currentMode = BlinkMode::Blinking;
-
-static void applyMode(BlinkMode mode) {
-    switch (mode) {
-        case BlinkMode::AlwaysOn:
-            redLed.set(LedState::On);
-            blueLed.set(LedState::On);
-            break;
-        case BlinkMode::AlwaysOff:
-            redLed.set(LedState::Off);
-            blueLed.set(LedState::Off);
-            break;
-        case BlinkMode::Blinking:
-            break;
-    }
-}
-
-static const char* modeLabel(BlinkMode mode) {
-    switch (mode) {
-        case BlinkMode::Blinking:  return "Blinking";
-        case BlinkMode::AlwaysOn:  return "Always ON";
-        case BlinkMode::AlwaysOff: return "Always OFF";
-    }
-    return "";
-}
 
 void setup() {
     Serial.begin(Config::SERIAL_BAUD);
-
-    redLed.init();
-    blueLed.init();
-
-    pinMode(Config::BUTTON_PIN,      INPUT_PULLUP);
-    pinMode(Config::BOOT_BUTTON_PIN, INPUT_PULLUP);
-
-    attachInterrupt(digitalPinToInterrupt(Config::BUTTON_PIN),
-                    onModeButton,  RISING);
-    attachInterrupt(digitalPinToInterrupt(Config::BOOT_BUTTON_PIN),
-                    onSpeedButton, RISING);
-
-    Serial.println("=== Embedded C++ Blinker ===");
-    Serial.print("Mode: ");
-    Serial.println(modeLabel(currentMode));
-    Serial.println("GPIO7 = cycle mode | BOOT = fast/slow");
+    relayTimer.begin();
+    motorPwm.begin();
+    Serial.println("=== Relay Timer + Soft PWM ===");
+    Serial.println("Relay measurements starting...");
 }
 
 void loop() {
-    static unsigned long loopCount       = 0;
-    static unsigned long reportStart     = 0;
-    static unsigned long lastModeDebounce  = 0;
-    static unsigned long lastSpeedDebounce = 0;
-    static bool          fastBlink       = false;
-
     const unsigned long now = millis();
 
-    if (gModeButtonEvent && (now - lastModeDebounce >= Config::DEBOUNCE_MS)) {
-        gModeButtonEvent   = false;
-        lastModeDebounce   = now;
+    relayTimer.tick(now);
 
-        switch (currentMode) {
-            case BlinkMode::Blinking:  currentMode = BlinkMode::AlwaysOn;  break;
-            case BlinkMode::AlwaysOn:  currentMode = BlinkMode::AlwaysOff; break;
-            case BlinkMode::AlwaysOff: currentMode = BlinkMode::Blinking;  break;
-        }
-        applyMode(currentMode);
+    const uint32_t adcVal = analogRead(Config::POT_PIN);
+    const uint8_t  duty   = static_cast<uint8_t>((adcVal * 100UL) / Config::ADC_MAX);
+    motorPwm.setDuty(duty);
+    motorPwm.tick(now);
 
-        Serial.print("Mode: ");
-        Serial.println(modeLabel(currentMode));
-    }
-
-    if (gSpeedButtonEvent && (now - lastSpeedDebounce >= Config::DEBOUNCE_MS)) {
-        gSpeedButtonEvent  = false;
-        lastSpeedDebounce  = now;
-
-        fastBlink = !fastBlink;
-        const unsigned long period = fastBlink ? Config::FAST_BLINK_MS
-                                               : Config::SLOW_BLINK_MS;
-        redBlinker.setPeriod(period);
-        blueBlinker.setPeriod(period);
-
-        Serial.print("Speed: ");
-        Serial.println(fastBlink ? "fast (200ms)" : "slow (800ms)");
-    }
-
-    if (currentMode == BlinkMode::Blinking) {
-        redBlinker.tick(now);
-        blueBlinker.tick(now);
-    }
-
-    if (++loopCount % Config::REPORT_EVERY == 0) {
-        const unsigned long elapsed = now - reportStart;
-        Serial.print("1000 iter = ");
-        Serial.print(elapsed);
-        Serial.println(" ms");
-        reportStart = now;
+    static unsigned long lastPrint = 0;
+    static uint8_t       lastDuty  = 255;
+    if (duty != lastDuty && now - lastPrint >= 200UL) {
+        Serial.print("PWM duty: ");
+        Serial.print(duty);
+        Serial.println("%");
+        lastDuty  = duty;
+        lastPrint = now;
     }
 }
