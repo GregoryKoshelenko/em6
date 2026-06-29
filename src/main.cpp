@@ -1,13 +1,13 @@
 #include <Arduino.h>
 
-static const int LDR_PIN = 4;
-static const int LED_PIN = 2;
-// static const int POT_PIN = 5;  // optional: potentiometer for max-brightness
+static const uint8_t  LDR_PIN = 4;
+static const uint8_t  LED_PIN = 2;
+// static const uint8_t  POT_PIN = 5;  // optional: potentiometer for max-brightness
 
-static const int      LEDC_CH   = 0; // LEDC channel to use for PWM output
-static const int      LEDC_FREQ = 5000; // 5 kHz PWM frequency
-static const int      LEDC_BITS = 8;    // PWM resolution
-static const int      LEDC_MAX  = (1 << LEDC_BITS) - 1;
+static const uint8_t  LEDC_CH   = 0; // LEDC channel to use for PWM output
+static const uint32_t LEDC_FREQ = 5000; // 5 kHz PWM frequency
+static const uint8_t  LEDC_BITS = 8;    // PWM resolution
+static const uint32_t LEDC_MAX  = (1U << LEDC_BITS) - 1U;
 
 static const uint32_t SAMPLE_MS = 20;    // 50 Hz
 static const uint32_t PRINT_MS  = 500;
@@ -21,12 +21,12 @@ static float    currentPWM = 0.0f;
 static float    targetPWM  = 0.0f;
 static uint32_t lastSample = 0;
 static uint32_t lastPrint  = 0;
-static int      rawADC     = 0;
-static int      lightMin   = 4095;
-static int      lightMax   = 0;
+static int32_t  rawADC     = 0;
+static int32_t  lightMin   = 4095;
+static int32_t  lightMax   = 0;
 
 /** Detects open-circuit (LDR disconnected) and short-circuit conditions. */
-static bool validateSensor(int raw) {
+static bool validateSensor(int32_t raw) {
     if (raw <= 10)   { Serial.println("[WARN] LDR short or missing"); return false; }
     if (raw >= 4090) { Serial.println("[WARN] LDR open circuit");     return false; }
     return true;
