@@ -4,8 +4,6 @@ const uint8_t ldrPin = 4; // LDR sensor connected to GPIO 4
 const uint8_t adcResolution = 12; //-bit ADC resolution
 const adc_attenuation_t adcAttenuation = ADC_11db; // ADC attenuation for full range (0-3.3V)
 
-
-
 void setup() {
   Serial.begin(115200); // Start serial communication at 115200 baud rate
   analogReadResolution(adcResolution); // Set ADC resolution
