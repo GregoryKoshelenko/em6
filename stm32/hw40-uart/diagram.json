@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "author": "Gregory Koshelenko (GK)",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-st-nucleo-l031k6",
+      "id": "nucleo",
+      "top": -75.59,
+      "left": -217.25,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": -90,
+      "left": -82.6,
+      "attrs": {
+        "color": "limegreen",
+        "flip": ""
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": -34.45,
+      "left": -134.4,
+      "attrs": {
+        "value": "1000"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 60,
+      "left": -60,
+      "attrs": {
+        "color": "blue",
+        "label": "BTN"
+      }
+    }
+  ],
+  "connections": [
+    [ "$serialMonitor:TX", "nucleo:VCP_RX", "", [] ],
+    [ "$serialMonitor:RX", "nucleo:VCP_TX", "", [] ],
+    [ "led1:A", "nucleo:D13", "green", [ "v144", "h-95.4" ] ],
+    [ "led1:C", "nucleo:GND.9", "black", [ "v0", "h28.4", "v-48", "h-105.6", "v43.2" ] ],
+    [ "nucleo:GND.2", "r2:1", "black", [ "h0" ] ],
+    [ "led1:C", "r2:2", "black", [ "v0" ] ],
+    [ "btn1:1.l", "nucleo:D2", "blue", [] ],
+    [ "btn1:2.r", "nucleo:GND.9", "black", [] ]
+  ],
+  "dependencies": {}
+}

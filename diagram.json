@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "author": "Gregory Koshelenko (GK)",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-led", "id": "led", "top": -80, "left": 200, "attrs": { "color": "limegreen" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": 20, "left": 190, "rotate": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-pushbutton", "id": "btn", "top": 160, "left": 200, "attrs": { "color": "blue", "label": "BTN" } }
+  ],
+  "connections": [
+    [ "esp:17", "$serialMonitor:RX", "orange", [] ],
+    [ "esp:18", "$serialMonitor:TX", "yellow", [] ],
+    [ "esp:2", "r1:2", "green", [] ],
+    [ "r1:1", "led:A", "green", [] ],
+    [ "led:C", "esp:GND.1", "black", [] ],
+    [ "esp:4", "btn:1.l", "blue", [] ],
+    [ "btn:2.l", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}
