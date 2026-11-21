@@ -1,169 +1,155 @@
 #include <Arduino.h>
-#include <esp_sleep.h>
 
 struct Config {
-    static constexpr uint8_t  LED1_PIN         = 2;
-    static constexpr uint8_t  LED2_PIN         = 21;
-    static constexpr uint8_t  LED3_PIN         = 19;
+    static constexpr uint8_t RED_PIN    = 2;
+    static constexpr uint8_t YELLOW_PIN = 21;
+    static constexpr uint8_t GREEN_PIN  = 19;
+    static constexpr uint8_t BUTTON_PIN = 0;   // BOOT button, active LOW
 
-    static constexpr unsigned long LED1_PERIOD_MS  = 200UL;
-    static constexpr unsigned long LED2_PERIOD_MS  = 500UL;
-    static constexpr unsigned long LED3_PERIOD_MS  = 1000UL;
+    static constexpr uint32_t GREEN_MS        = 10000;
+    static constexpr uint32_t GREEN_BLINK_MS  = 3000;
+    static constexpr uint32_t YELLOW_MS       = 3000;
+    static constexpr uint32_t RED_MS          = 10000;
+    static constexpr uint32_t RED_YELLOW_MS   = 2000;
+    static constexpr uint32_t BLINK_HALF_MS   = 500;   // 1 Hz blinking
+    static constexpr uint32_t DEBOUNCE_MS     = 50;
 
-    static constexpr unsigned long REPORT_EVERY_MS = 5000UL;
-    static constexpr unsigned long MIN_SLEEP_MS    = 2UL;
-
-    static constexpr float NORMAL_MW = 240.0f;
-    static constexpr float SLEEP_MW  = 0.8f;
-
-    static constexpr uint32_t SERIAL_BAUD = 115200UL;
+    static constexpr uint32_t SERIAL_BAUD = 115200;
 };
-
-enum class LedState : uint8_t { Off = LOW, On = HIGH };
 
 class Led {
 public:
-    constexpr explicit Led(uint8_t pin)
-        : _pin(pin), _state(LedState::Off) {}
+    constexpr explicit Led(uint8_t pin) : _pin(pin) {}
+    void init() const { pinMode(_pin, OUTPUT); set(false); }
+    void set(bool on) const { digitalWrite(_pin, on ? HIGH : LOW); }
+private:
+    const uint8_t _pin;
+};
 
-    void init() {
-        pinMode(_pin, OUTPUT);
-        set(LedState::Off);
+class Button {
+public:
+    constexpr explicit Button(uint8_t pin) : _pin(pin) {}
+
+    void init() { pinMode(_pin, INPUT_PULLUP); }
+
+    // Returns true once per press, after the signal is stable for DEBOUNCE_MS.
+    bool pressed(uint32_t now) {
+        const bool raw = digitalRead(_pin) == LOW;
+        if (raw != _lastRaw) {
+            _lastRaw    = raw;
+            _changedAt  = now;
+        }
+        if (now - _changedAt >= Config::DEBOUNCE_MS && raw != _stable) {
+            _stable = raw;
+            return _stable;
+        }
+        return false;
     }
-
-    void set(LedState state) {
-        _state = state;
-        digitalWrite(_pin, static_cast<uint8_t>(state));
-    }
-
-    void toggle() {
-        set(_state == LedState::On ? LedState::Off : LedState::On);
-    }
-
-    LedState state() const { return _state; }
 
 private:
     const uint8_t _pin;
-    LedState      _state;
+    bool     _lastRaw   = false;
+    bool     _stable    = false;
+    uint32_t _changedAt = 0;
 };
 
-class Blinker {
-public:
-    Blinker(Led& led, unsigned long periodMs)
-        : _led(led), _halfPeriod(periodMs / 2), _last(0) {}
+enum class State : uint8_t {
+    Green,
+    GreenBlink,
+    Yellow,
+    Red,
+    RedYellow,
+    YellowBlink,   // unregulated crossing (service mode)
+};
 
-    void tick(unsigned long now) {
-        if (now - _last >= _halfPeriod) {
-            _led.toggle();
-            _last = now;
-        }
+class TrafficLight {
+public:
+    TrafficLight(const Led& red, const Led& yellow, const Led& green)
+        : _red(red), _yellow(yellow), _green(green) {}
+
+    void begin(uint32_t now) { enter(State::Green, now); }
+
+    void toggleService(uint32_t now) {
+        enter(_state == State::YellowBlink ? State::Red : State::YellowBlink, now);
     }
 
-    unsigned long timeUntilNext(unsigned long now) const {
-        const unsigned long elapsed = now - _last;
-        if (elapsed >= _halfPeriod) return 0;
-        return _halfPeriod - elapsed;
+    void tick(uint32_t now) {
+        const uint32_t elapsed = now - _enteredAt;
+        const bool blinkOn = (elapsed / Config::BLINK_HALF_MS) % 2 == 0;
+
+        switch (_state) {
+            case State::Green:
+                if (elapsed >= Config::GREEN_MS) enter(State::GreenBlink, now);
+                break;
+            case State::GreenBlink:
+                _green.set(blinkOn);
+                if (elapsed >= Config::GREEN_BLINK_MS) enter(State::Yellow, now);
+                break;
+            case State::Yellow:
+                if (elapsed >= Config::YELLOW_MS) enter(State::Red, now);
+                break;
+            case State::Red:
+                if (elapsed >= Config::RED_MS) enter(State::RedYellow, now);
+                break;
+            case State::RedYellow:
+                if (elapsed >= Config::RED_YELLOW_MS) enter(State::Green, now);
+                break;
+            case State::YellowBlink:
+                _yellow.set(blinkOn);
+                break;
+        }
     }
 
 private:
-    Led&          _led;
-    unsigned long _halfPeriod;
-    unsigned long _last;
+    void enter(State next, uint32_t now) {
+        _state     = next;
+        _enteredAt = now;
+        _red.set(next == State::Red || next == State::RedYellow);
+        _yellow.set(next == State::Yellow || next == State::RedYellow
+                    || next == State::YellowBlink);
+        _green.set(next == State::Green || next == State::GreenBlink);
+        Serial.printf("[%lu ms] -> %s\n", static_cast<unsigned long>(now), name(next));
+    }
+
+    static const char* name(State s) {
+        switch (s) {
+            case State::Green:       return "GREEN";
+            case State::GreenBlink:  return "GREEN BLINK";
+            case State::Yellow:      return "YELLOW";
+            case State::Red:         return "RED";
+            case State::RedYellow:   return "RED + YELLOW";
+            case State::YellowBlink: return "YELLOW BLINK (unregulated)";
+        }
+        return "?";
+    }
+
+    const Led& _red;
+    const Led& _yellow;
+    const Led& _green;
+    State    _state     = State::Green;
+    uint32_t _enteredAt = 0;
 };
 
-
-class PowerSleep {
-public:
-    static constexpr uint8_t MAX_SOURCES = 4;
-
-    PowerSleep()
-        : _count(0), _totalActiveUs(0), _totalSleepMs(0), _lastReport(0) {}
-
-    void add(Blinker& b) {
-        if (_count < MAX_SOURCES) _sources[_count++] = &b;
-    }
-
-    void tick(unsigned long now, unsigned long activeStartUs) {
-        _totalActiveUs += micros() - activeStartUs;
-
-        const unsigned long sleepMs = _nextEvent(now);
-
-        if (sleepMs >= Config::MIN_SLEEP_MS) {
-            _totalSleepMs += sleepMs;
-            Serial.flush();
-            esp_sleep_enable_timer_wakeup(sleepMs * 1000UL);
-            esp_light_sleep_start();
-        }
-    }
-
-    void report(unsigned long now) {
-        if (now - _lastReport < Config::REPORT_EVERY_MS) return;
-
-        const float totalMs     = static_cast<float>(_totalSleepMs)
-                                + static_cast<float>(_totalActiveUs) / 1000.0f;
-        const float activeRatio = (_totalActiveUs / 1000.0f) / totalMs;
-        const float sleepRatio  = static_cast<float>(_totalSleepMs) / totalMs;
-        const float avgPower    = (activeRatio * Config::NORMAL_MW)
-                                + (sleepRatio  * Config::SLEEP_MW);
-
-        Serial.println("---------------------");
-        Serial.print("Active: "); Serial.print(activeRatio * 100.0f, 2); Serial.println(" %");
-        Serial.print("Sleep:  "); Serial.print(sleepRatio  * 100.0f, 2); Serial.println(" %");
-        Serial.print("~Power: "); Serial.print(avgPower, 3);             Serial.println(" mW");
-
-        _totalActiveUs = 0;
-        _totalSleepMs  = 0;
-        _lastReport    = now;
-    }
-
-private:
-    unsigned long _nextEvent(unsigned long now) const {
-        unsigned long minMs = 0xFFFFFFFFUL;
-        for (uint8_t i = 0; i < _count; ++i) {
-            const unsigned long t = _sources[i]->timeUntilNext(now);
-            if (t < minMs) minMs = t;
-        }
-        return minMs;
-    }
-
-    Blinker*      _sources[MAX_SOURCES];
-    uint8_t       _count;
-    unsigned long _totalActiveUs;
-    unsigned long _totalSleepMs;
-    unsigned long _lastReport;
-};
-
-static Led led1(Config::LED1_PIN);
-static Led led2(Config::LED2_PIN);
-static Led led3(Config::LED3_PIN);
-
-static Blinker   blinker1(led1, Config::LED1_PERIOD_MS);
-static Blinker   blinker2(led2, Config::LED2_PERIOD_MS);
-static Blinker   blinker3(led3, Config::LED3_PERIOD_MS);
-static PowerSleep sleeper;
+static const Led    redLed(Config::RED_PIN);
+static const Led    yellowLed(Config::YELLOW_PIN);
+static const Led    greenLed(Config::GREEN_PIN);
+static Button       modeButton(Config::BUTTON_PIN);
+static TrafficLight light(redLed, yellowLed, greenLed);
 
 void setup() {
     Serial.begin(Config::SERIAL_BAUD);
-    led1.init();
-    led2.init();
-    led3.init();
+    redLed.init();
+    yellowLed.init();
+    greenLed.init();
+    modeButton.init();
 
-    sleeper.add(blinker1);
-    sleeper.add(blinker2);
-    sleeper.add(blinker3);
-
-    Serial.println("=== Power-Save Superloop ===");
-    Serial.println("LED1: 200ms | LED2: 500ms | LED3: 1000ms");
+    Serial.println("=== Traffic light (PDR Ukraine) ===");
+    Serial.println("BOOT button: toggle yellow blinking mode");
+    light.begin(millis());
 }
 
 void loop() {
-    const unsigned long activeStartUs = micros();
-    const unsigned long now           = millis();
-
-    blinker1.tick(now);
-    blinker2.tick(now);
-    blinker3.tick(now);
-
-    sleeper.tick(now, activeStartUs);
-    sleeper.report(now);
+    const uint32_t now = millis();
+    if (modeButton.pressed(now)) light.toggleService(now);
+    light.tick(now);
 }
