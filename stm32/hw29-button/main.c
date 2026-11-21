@@ -1,6 +1,6 @@
 // Lesson 29 (2.8) - STM32 intro: LED reacts to a button (STM32 HAL)
 // Board: Nucleo-L031K6. Based on Wokwi example 367244067477216257
-// Simulation: https://wokwi.com/projects/481313149781277697
+// Simulation: https://wokwi.com/projects/481315097601800193
 
 #include <stdio.h>
 #include <stdint.h>
