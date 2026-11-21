@@ -58,6 +58,11 @@ public:
         _halfPeriod = periodMs / 2;
     }
 
+    void restart(unsigned long now) {
+        _led.set(LedState::On);
+        _last = now;
+    }
+
     void tick(unsigned long now) {
         if (now - _last >= _halfPeriod) {
             _led.toggle();
@@ -85,7 +90,7 @@ static Blinker redBlinker(redLed,  Config::SLOW_BLINK_MS);
 static Blinker blueBlinker(blueLed, Config::SLOW_BLINK_MS);
 static BlinkMode currentMode = BlinkMode::Blinking;
 
-static void applyMode(BlinkMode mode) {
+static void applyMode(BlinkMode mode, unsigned long now) {
     switch (mode) {
         case BlinkMode::AlwaysOn:
             redLed.set(LedState::On);
@@ -96,8 +101,21 @@ static void applyMode(BlinkMode mode) {
             blueLed.set(LedState::Off);
             break;
         case BlinkMode::Blinking:
+            redBlinker.restart(now);
+            blueBlinker.restart(now);
             break;
     }
+}
+
+// Consumes the ISR flag on every edge, so bounces inside the debounce
+// window are dropped instead of firing later as a delayed event.
+static bool takeDebouncedEvent(volatile bool& flag, unsigned long& lastAccepted,
+                               unsigned long now) {
+    if (!flag) return false;
+    flag = false;
+    if (now - lastAccepted < Config::DEBOUNCE_MS) return false;
+    lastAccepted = now;
+    return true;
 }
 
 static const char* modeLabel(BlinkMode mode) {
@@ -138,24 +156,20 @@ void loop() {
 
     const unsigned long now = millis();
 
-    if (gModeButtonEvent && (now - lastModeDebounce >= Config::DEBOUNCE_MS)) {
-        gModeButtonEvent   = false;
-        lastModeDebounce   = now;
+    if (takeDebouncedEvent(gModeButtonEvent, lastModeDebounce, now)) {
 
         switch (currentMode) {
             case BlinkMode::Blinking:  currentMode = BlinkMode::AlwaysOn;  break;
             case BlinkMode::AlwaysOn:  currentMode = BlinkMode::AlwaysOff; break;
             case BlinkMode::AlwaysOff: currentMode = BlinkMode::Blinking;  break;
         }
-        applyMode(currentMode);
+        applyMode(currentMode, now);
 
         Serial.print("Mode: ");
         Serial.println(modeLabel(currentMode));
     }
 
-    if (gSpeedButtonEvent && (now - lastSpeedDebounce >= Config::DEBOUNCE_MS)) {
-        gSpeedButtonEvent  = false;
-        lastSpeedDebounce  = now;
+    if (takeDebouncedEvent(gSpeedButtonEvent, lastSpeedDebounce, now)) {
 
         fastBlink = !fastBlink;
         const unsigned long period = fastBlink ? Config::FAST_BLINK_MS
