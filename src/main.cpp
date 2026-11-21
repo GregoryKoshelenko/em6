@@ -6,13 +6,14 @@ struct Config {
     static constexpr uint8_t GREEN_PIN  = 19;
     static constexpr uint8_t BUTTON_PIN = 0;   // BOOT button, active LOW
 
-    static constexpr uint32_t GREEN_MS        = 10000;
+    static constexpr uint32_t GREEN_MS        = 5000;
     static constexpr uint32_t GREEN_BLINK_MS  = 3000;
-    static constexpr uint32_t YELLOW_MS       = 3000;
-    static constexpr uint32_t RED_MS          = 10000;
+    static constexpr uint32_t YELLOW_MS       = 2000;
+    static constexpr uint32_t RED_MS          = 5000;
     static constexpr uint32_t RED_YELLOW_MS   = 2000;
     static constexpr uint32_t BLINK_HALF_MS   = 500;   // 1 Hz blinking
     static constexpr uint32_t DEBOUNCE_MS     = 50;
+    static constexpr uint32_t LOOP_IDLE_MS    = 10;    // lets the simulator/CPU idle
 
     static constexpr uint32_t SERIAL_BAUD = 115200;
 };
@@ -152,4 +153,5 @@ void loop() {
     const uint32_t now = millis();
     if (modeButton.pressed(now)) light.toggleService(now);
     light.tick(now);
+    delay(Config::LOOP_IDLE_MS);
 }
