@@ -100,11 +100,11 @@ private:
 
 class SoftPwm {
 public:
-    explicit SoftPwm(uint8_t pin) : _pin(pin), _duty(0) {}
+    explicit SoftPwm(uint8_t pin) : _pin(pin), _duty(0), _level(LOW) {}
 
     void begin() {
         pinMode(_pin, OUTPUT);
-        digitalWrite(_pin, LOW);
+        digitalWrite(_pin, _level);
     }
 
     void setDuty(uint8_t duty) {
@@ -116,12 +116,17 @@ public:
     void tick(unsigned long now) {
         const unsigned long phase  = now % Config::PWM_PERIOD_MS;
         const unsigned long onTime = (Config::PWM_PERIOD_MS * _duty) / 100UL;
-        digitalWrite(_pin, phase < onTime ? HIGH : LOW);
+        const uint8_t level = (phase < onTime) ? HIGH : LOW;
+        if (level != _level) {  // write the pin only when the level changes
+            _level = level;
+            digitalWrite(_pin, _level);
+        }
     }
 
 private:
     const uint8_t _pin;
     uint8_t       _duty;
+    uint8_t       _level;
 };
 
 
