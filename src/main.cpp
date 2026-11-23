@@ -133,24 +133,28 @@ private:
     unsigned long _lastReport;
 };
 
-static Led led1(Config::LED1_PIN);
-static Led led2(Config::LED2_PIN);
-static Led led3(Config::LED3_PIN);
+static Led leds[] = {
+    Led(Config::LED1_PIN),
+    Led(Config::LED2_PIN),
+    Led(Config::LED3_PIN),
+};
 
-static Blinker   blinker1(led1, Config::LED1_PERIOD_MS);
-static Blinker   blinker2(led2, Config::LED2_PERIOD_MS);
-static Blinker   blinker3(led3, Config::LED3_PERIOD_MS);
+static Blinker blinkers[] = {
+    Blinker(leds[0], Config::LED1_PERIOD_MS),
+    Blinker(leds[1], Config::LED2_PERIOD_MS),
+    Blinker(leds[2], Config::LED3_PERIOD_MS),
+};
 static PowerSleep sleeper;
 
 void setup() {
     Serial.begin(Config::SERIAL_BAUD);
-    led1.init();
-    led2.init();
-    led3.init();
+    for (Led& led : leds) {
+        led.init();
+    }
 
-    sleeper.add(blinker1);
-    sleeper.add(blinker2);
-    sleeper.add(blinker3);
+    for (Blinker& blinker : blinkers) {
+        sleeper.add(blinker);
+    }
 
     Serial.println("=== Power-Save Superloop ===");
     Serial.println("LED1: 200ms | LED2: 500ms | LED3: 1000ms");
@@ -160,9 +164,9 @@ void loop() {
     const unsigned long activeStartUs = micros();
     const unsigned long now           = millis();
 
-    blinker1.tick(now);
-    blinker2.tick(now);
-    blinker3.tick(now);
+    for (Blinker& blinker : blinkers) {
+        blinker.tick(now);
+    }
 
     sleeper.tick(now, activeStartUs);
     sleeper.report(now);
