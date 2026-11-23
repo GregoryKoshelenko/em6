@@ -15,19 +15,29 @@ bool redState = false;
 bool blueState = false;
 bool flasherEnabled = false;  // true=ON, false=OFF
 bool showRed = true;
+volatile bool buttonEvent = false;  // set in ISR, handled in loop()
 
-// Interrupt handler for button press
+// Interrupt handler for button press: only debounce and set a flag
 void IRAM_ATTR buttonPressed() {
   unsigned long currentTime = millis();
-  
+
   // Debounce check - ignore if pressed too soon
   if (currentTime - lastButtonPress < DEBOUNCE_DELAY) {
     return;
   }
-  
+
   lastButtonPress = currentTime;
-  flasherEnabled = !flasherEnabled;  // Toggle ON/OFF
-  
+  buttonEvent = true;
+}
+
+// Toggle ON/OFF outside the ISR (Serial is not safe in interrupts)
+void handleButton() {
+  if (!buttonEvent) {
+    return;
+  }
+  buttonEvent = false;
+  flasherEnabled = !flasherEnabled;
+
   // Turn off both LEDs when toggled off
   if (!flasherEnabled) {
     digitalWrite(RED_LED, LOW);
@@ -35,13 +45,8 @@ void IRAM_ATTR buttonPressed() {
     redState = false;
     blueState = false;
   }
-  
-  if (flasherEnabled) {
-    Serial.println("Flasher ON");
-  } else {
-    Serial.println("Flasher OFF");
-  }
-  Serial.flush();
+
+  Serial.println(flasherEnabled ? "Flasher ON" : "Flasher OFF");
 }
 
 void setup() {
@@ -65,6 +70,8 @@ void setup() {
 }
 
 void loop() {
+  handleButton();
+
   if (!flasherEnabled) {
     // Flasher is off - all LEDs stay off
     return;
