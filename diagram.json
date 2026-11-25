@@ -5,7 +5,8 @@
   "parts": [
     { "type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
     { "type": "board-ssd1306", "id": "oled", "top": -100, "left": 180, "attrs": { "i2cAddress": "0x3c" } },
-    { "type": "wokwi-ds1307", "id": "rtc", "top": 60, "left": 200, "attrs": {} }
+    { "type": "wokwi-ds1307", "id": "rtc", "top": 60, "left": 200, "attrs": {} },
+    { "type": "chip-bme280", "id": "bme", "top": 170, "left": 200, "attrs": { "temperature": "23.4", "humidity": "45", "pressure": "1013" } }
   ],
   "connections": [
     [ "esp:TX", "$serialMonitor:RX", "", [] ],
@@ -17,7 +18,13 @@
     [ "rtc:SDA", "esp:8", "blue", [] ],
     [ "rtc:SCL", "esp:9", "gold", [] ],
     [ "rtc:5V", "esp:5V", "red", [] ],
-    [ "rtc:GND", "esp:GND.1", "black", [] ]
+    [ "rtc:GND", "esp:GND.1", "black", [] ],
+    [ "bme:SCK", "esp:12", "green", [] ],
+    [ "bme:SDI", "esp:11", "violet", [] ],
+    [ "bme:SDO", "esp:13", "orange", [] ],
+    [ "bme:CSB", "esp:10", "white", [] ],
+    [ "bme:VCC", "esp:3V3.1", "red", [] ],
+    [ "bme:GND", "esp:GND.1", "black", [] ]
   ],
   "dependencies": {}
 }

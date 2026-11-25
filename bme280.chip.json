@@ -1,0 +1,10 @@
+{
+  "name": "BME280 (SPI)",
+  "author": "Gregory Koshelenko (GK)",
+  "pins": ["VCC", "GND", "SCK", "SDI", "SDO", "CSB"],
+  "controls": [
+    { "id": "temperature", "label": "Temperature, °C", "type": "range", "min": -40, "max": 85, "step": 0.1 },
+    { "id": "humidity", "label": "Humidity, %RH", "type": "range", "min": 0, "max": 100, "step": 0.5 },
+    { "id": "pressure", "label": "Pressure, hPa", "type": "range", "min": 300, "max": 1100, "step": 0.5 }
+  ]
+}
