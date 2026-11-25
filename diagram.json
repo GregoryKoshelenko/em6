@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "author": "Gregory Koshelenko (GK)",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "potLed", "top": -120, "left": -200, "attrs": { "value": "300" } },
+    { "type": "wokwi-potentiometer", "id": "potMotor", "top": -120, "left": -90, "attrs": { "value": "700" } },
+    { "type": "wokwi-led", "id": "led", "top": -90, "left": 200, "attrs": { "color": "yellow", "label": "LED" } },
+    { "type": "wokwi-resistor", "id": "r1", "top": 20, "left": 190, "rotate": 90, "attrs": { "value": "100" } },
+    { "type": "wokwi-led", "id": "motorInd", "top": -90, "left": 250, "attrs": { "color": "blue", "label": "MOTOR" } },
+    { "type": "wokwi-resistor", "id": "r2", "top": 20, "left": 240, "rotate": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-logic-analyzer", "id": "logic", "top": 150, "left": 220, "attrs": {} }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "potLed:SIG", "esp:1", "green", [] ],
+    [ "potLed:VCC", "esp:3V3.1", "red", [] ],
+    [ "potLed:GND", "esp:GND.1", "black", [] ],
+    [ "potMotor:SIG", "esp:2", "green", [] ],
+    [ "potMotor:VCC", "esp:3V3.1", "red", [] ],
+    [ "potMotor:GND", "esp:GND.1", "black", [] ],
+    [ "esp:4", "r1:2", "gold", [] ],
+    [ "r1:1", "led:A", "gold", [] ],
+    [ "led:C", "esp:GND.1", "black", [] ],
+    [ "esp:5", "r2:2", "blue", [] ],
+    [ "r2:1", "motorInd:A", "blue", [] ],
+    [ "motorInd:C", "esp:GND.1", "black", [] ],
+    [ "logic:D0", "esp:4", "gold", [] ],
+    [ "logic:D1", "esp:5", "blue", [] ],
+    [ "logic:GND", "esp:GND.1", "black", [] ]
+  ],
+  "dependencies": {}
+}
